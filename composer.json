@@ -15,9 +15,11 @@
     "laravel/pail": "^1.2.5",
     "laravel/pao": "^1.0.6",
     "laravel/pint": "^1.27",
+    "barryvdh/laravel-ide-helper": "^3.2",
     "mockery/mockery": "^1.6",
     "nunomaduro/collision": "^8.6",
     "phpunit/phpunit": "^12.5.12",
+    "rector/rector": "^2.0",
     "shipmonk/phpstan-baseline-per-identifier": "^2.0",
     "staabm/phpstan-todo-by": "^0.2"
   },
@@ -56,6 +58,17 @@
     ],
     "format": [
       "@php vendor/bin/pint"
+    ],
+    "refactor": [
+      "@php vendor/bin/rector process --dry-run"
+    ],
+    "refactor:fix": [
+      "@php vendor/bin/rector process"
+    ],
+    "ide:helpers": [
+      "@php artisan ide-helper:generate",
+      "@php artisan ide-helper:models --nowrite",
+      "@php artisan ide-helper:meta"
     ],
     "post-autoload-dump": [
       "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

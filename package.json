@@ -15,6 +15,8 @@
     "check": "node scripts/check.mjs",
     "check:quick": "node scripts/check.mjs --quick",
     "dev:doctor": "node scripts/doctor.mjs",
+    "secrets:sync": "node scripts/sync-secrets.mjs",
+    "secrets:sync:dry-run": "node scripts/sync-secrets.mjs --dry-run",
     "prepare": "husky"
   },
   "devDependencies": {
