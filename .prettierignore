@@ -1,0 +1,14 @@
+vendor/
+node_modules/
+public/build/
+public/css/
+public/js/
+public/fonts/
+storage/
+bootstrap/cache/
+coverage/
+composer.lock
+pnpm-lock.yaml
+package-lock.json
+*.min.js
+*.min.css

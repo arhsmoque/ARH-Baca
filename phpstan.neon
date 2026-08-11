@@ -1,0 +1,14 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/staabm/phpstan-todo-by/extension.neon
+    - vendor/shipmonk/phpstan-baseline-per-identifier/extension.neon
+
+parameters:
+    paths:
+        - app
+    level: 5
+    excludePaths:
+        - app/Console/Kernel.php
+    shipmonkBaselinePerIdentifier:
+        directory: %currentWorkingDirectory%/baselines
+        indent: '    '

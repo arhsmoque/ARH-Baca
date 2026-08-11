@@ -1,0 +1,42 @@
+{
+  "$schema": "https://www.schemastore.org/package.json",
+  "name": "arh-baca",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint resources/js/",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "secrets:check": "secretlint \"**/*\"",
+    "check": "node scripts/check.mjs",
+    "check:quick": "node scripts/check.mjs --quick",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@playwright/test": "^1.62.0",
+    "@secretlint/secretlint-rule-preset-recommend": "^13.0.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "concurrently": "^9.0.1",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "husky": "^9.1.0",
+    "laravel-vite-plugin": "^3.1",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.5.0",
+    "secretlint": "^13.0.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.8.0",
+    "vite": "^8.0.0"
+  },
+  "lint-staged": {
+    "*.php": "vendor/bin/pint",
+    "*.{js,mjs,cjs,ts,css,json,md,yaml,yml}": "prettier --check",
+    "**/*": "secretlint"
+  }
+}
