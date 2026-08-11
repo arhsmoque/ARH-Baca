@@ -31,17 +31,17 @@ A Laravel 13 + Filament + Livewire collaborative study platform. Successor to th
 
 ```bash
 # Verify environment
-pnpm doctor
+pnpm run dev:doctor
 
 # Install everything
 composer install
 pnpm install
 
 # One-shot quality gate (secrets, format, Pint, PHPStan, tests, lint, typecheck, build)
-pnpm check
+pnpm run check
 
 # Quick quality gate (skips asset build)
-pnpm check:quick
+pnpm run check:quick
 
 # Dev server (Laravel + queue + logs + Vite)
 composer dev

@@ -1,27 +1,42 @@
 #!/usr/bin/env node
+process.noDeprecation = true;
+
 import { spawnSync } from 'node:child_process';
+import process from 'node:process';
 
 const quick = process.argv.includes('--quick');
 const json = process.argv.includes('--json');
-const pnpm = process.env.npm_execpath ?? 'pnpm';
+
+const isWindows = process.platform === 'win32';
+
+// pnpm is installed via Corepack on Windows and may only be resolvable from PATH
+// when a shell is involved. npm_execpath points at a .mjs file that cannot be
+// spawned directly, so always use the well-known "pnpm" command with shell mode
+// on Windows.
+const pnpmExec = 'pnpm';
+const pnpmNeedsShell = isWindows;
+
+const run = (executable, args, options = {}) => {
+  const shell = executable === pnpmExec && pnpmNeedsShell ? true : (options.shell ?? false);
+  return spawnSync(executable, args, { ...options, shell });
+};
 
 const definitions = [
-  ['Secrets', pnpm, ['secrets:check']],
-  ['Format', pnpm, ['format:check']],
-  ['PHP style (Pint)', 'vendor/bin/pint', ['--test']],
-  ['PHP static analysis', 'vendor/bin/phpstan', ['analyse', '--memory-limit=512M']],
+  ['Secrets', pnpmExec, ['secrets:check']],
+  ['Format', pnpmExec, ['format:check']],
+  ['PHP style (Pint)', 'php', ['vendor/bin/pint', '--test']],
+  ['PHP static analysis', 'php', ['vendor/bin/phpstan', 'analyse', '--memory-limit=512M']],
   ['PHP tests', 'php', ['artisan', 'test']],
-  ['JS lint', pnpm, ['lint']],
-  ['JS typecheck', pnpm, ['typecheck']],
-  ...(!quick ? [['Asset build', pnpm, ['build']]] : []),
+  ['JS lint', pnpmExec, ['lint']],
+  ['JS typecheck', pnpmExec, ['typecheck']],
+  ...(!quick ? [['Asset build', pnpmExec, ['build']]] : []),
 ];
 
 const results = [];
 for (const [name, executable, args] of definitions) {
   const started = Date.now();
-  const result = spawnSync(executable, args, {
+  const result = run(executable, args, {
     encoding: 'utf8',
-    shell: false,
     stdio: json ? 'pipe' : 'inherit',
   });
   results.push({

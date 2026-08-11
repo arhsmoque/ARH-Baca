@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test';
  * against an ephemeral SQLite app. Production smoke: set BASE_URL to skip
  * webServer and target the live host directly.
  */
-const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:8000';
+const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:8123';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -27,9 +27,9 @@ export default defineConfig({
   webServer: process.env.BASE_URL
     ? undefined
     : {
-        command: 'php artisan serve --host=127.0.0.1 --port=8000',
+        command: 'php artisan serve --host=127.0.0.1 --port=8123',
         url: BASE_URL,
-        reuseExistingServer: !process.env.CI,
+        reuseExistingServer: false,
         timeout: 30_000,
       },
 });

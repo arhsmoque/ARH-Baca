@@ -8,7 +8,7 @@ parameters:
         - app
     level: 5
     excludePaths:
-        - app/Console/Kernel.php
+        - app/Console/Kernel.php (?)
     shipmonkBaselinePerIdentifier:
         directory: %currentWorkingDirectory%/baselines
         indent: '    '

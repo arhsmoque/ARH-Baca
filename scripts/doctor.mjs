@@ -18,13 +18,28 @@ const command = (name, args = ['--version']) => {
   return result.status === 0 ? (result.stdout || result.stderr).trim().split(/\r?\n/)[0] : null;
 };
 
+const commandOnPath = (name) => {
+  let version = command(name);
+  if (version) return version;
+  // Windows often installs tools as .bat/.cmd rather than extensionless binaries,
+  // and Node's spawnSync without shell may not resolve them from PATH. Retry with
+  // shell enabled for version checks only (no untrusted input is passed).
+  if (process.platform === 'win32') {
+    const shellResult = spawnSync(name, ['--version'], { encoding: 'utf8', shell: true });
+    if (shellResult.status === 0) {
+      return (shellResult.stdout || shellResult.stderr).trim().split(/\r?\n/)[0];
+    }
+  }
+  return null;
+};
+
 const phpVersion = command('php');
 const phpMajorMinor = phpVersion?.match(/PHP (\d+)\.(\d+)/);
 const phpSupported =
   phpMajorMinor && (Number(phpMajorMinor[1]) > 8 || Number(phpMajorMinor[2]) >= 4);
 add('PHP', phpSupported ? 'PASS' : 'FAIL', phpVersion ?? 'not found; expected 8.4+');
 
-const composerVersion = command('composer');
+const composerVersion = commandOnPath('composer');
 add('Composer', composerVersion ? 'PASS' : 'FAIL', composerVersion ?? 'not found');
 
 const pnpmVersion = command('pnpm');

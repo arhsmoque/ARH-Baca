@@ -14,6 +14,7 @@
     "secrets:check": "secretlint \"**/*\"",
     "check": "node scripts/check.mjs",
     "check:quick": "node scripts/check.mjs --quick",
+    "dev:doctor": "node scripts/doctor.mjs",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -25,6 +26,7 @@
     "concurrently": "^9.0.1",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.0.0",
+    "globals": "^17.9.0",
     "husky": "^9.1.0",
     "laravel-vite-plugin": "^3.1",
     "lint-staged": "^15.0.0",
