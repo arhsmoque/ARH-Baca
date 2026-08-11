@@ -1,0 +1,33 @@
+[submodule "research/plugins/filament-notes"]
+	path = research/plugins/filament-notes
+	url = https://github.com/tomatophp/filament-notes.git
+[submodule "research/plugins/laravel-dashboard"]
+	path = research/plugins/laravel-dashboard
+	url = https://github.com/spatie/laravel-dashboard.git
+[submodule "research/plugins/soft-ui-dashboard-laravel-livewire"]
+	path = research/plugins/soft-ui-dashboard-laravel-livewire
+	url = https://github.com/creativetimofficial/soft-ui-dashboard-laravel-livewire.git
+[submodule "research/plugins/filament-themes"]
+	path = research/plugins/filament-themes
+	url = https://github.com/silasrm/filament-themes.git
+[submodule "research/plugins/filament-fullcalendar"]
+	path = research/plugins/filament-fullcalendar
+	url = https://github.com/saade/filament-fullcalendar.git
+[submodule "research/plugins/filament-filacraft-themes"]
+	path = research/plugins/filament-filacraft-themes
+	url = https://github.com/slym758/filament-filacraft-themes.git
+[submodule "research/plugins/filament-wirechat"]
+	path = research/plugins/filament-wirechat
+	url = https://github.com/adultdate/filament-wirechat.git
+[submodule "research/plugins/filament-kanban-board"]
+	path = research/plugins/filament-kanban-board
+	url = https://github.com/tales-virtualy/filament-kanban-board.git
+[submodule "research/plugins/tasks-management"]
+	path = research/plugins/tasks-management
+	url = https://github.com/alessandronuunes/tasks-management.git
+[submodule "research/plugins/pipo-scanner"]
+	path = research/plugins/pipo-scanner
+	url = https://github.com/LACV/pipo-scanner.git
+[submodule "research/plugins/silverstripe-pdf-parser"]
+	path = research/plugins/silverstripe-pdf-parser
+	url = https://github.com/andrewandante/silverstripe-pdf-parser.git
