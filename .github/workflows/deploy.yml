@@ -1,0 +1,277 @@
+name: Deploy to Cloud Run
+
+# Adapted from arh-urus/deploy.yml for ARH-Baca.
+# Deploys the Laravel 13 + Filament application to Google Cloud Run with a
+# Neon Postgres database. Migrations run as a Cloud Run Job before traffic
+# shifts to the new revision.
+on:
+  # Gated behind CI actually passing, not a bare push trigger (which would
+  # run independently/concurrently with ci.yml, deploying regardless of
+  # whether tests passed). workflow_run fires once CI finishes; the job
+  # below checks its conclusion before doing anything.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+# Prevent two deploys from racing each other; never cancel a deploy
+# mid-flight (that could leave the service half-migrated).
+concurrency:
+  group: arh-baca-deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  # workflow_run's github.sha is the default branch's tip at trigger time,
+  # not necessarily the exact commit CI just finished testing (edge case if
+  # more commits land while CI is running) - head_sha is the precise one.
+  # Falls back to github.sha for workflow_dispatch, which has no workflow_run context.
+  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+  IMAGE: asia-southeast1-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPOSITORY }}/${{ vars.CLOUD_RUN_SERVICE }}:${{ github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  deploy:
+    name: Build, migrate, deploy
+    runs-on: ubuntu-latest
+    environment: production
+    # Only deploy if manually dispatched, or if this is a workflow_run event
+    # AND the CI run it's reporting on actually succeeded - a bare push
+    # trigger would deploy regardless of whether tests passed.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    outputs:
+      service_url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-cloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install neonctl
+        run: npm install -g neonctl
+
+      # Neon's connection strings are computed fresh every run, never
+      # persisted as a static GH secret - NEON_API_KEY is write-only from
+      # GitHub's side (can't be read back out), so this is the only place
+      # these values can be produced. Masked immediately so neither ever
+      # reaches the log, even if a later step's output happens to include it.
+      - name: Fetch Neon connection strings
+        id: neon
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          POOLED=$(neonctl connection-string --project-id "${{ vars.NEON_PROJECT_ID }}" --role-name neondb_owner --database-name neondb --pooled | tr -d '[:space:]')
+          DIRECT=$(neonctl connection-string --project-id "${{ vars.NEON_PROJECT_ID }}" --role-name neondb_owner --database-name neondb | tr -d '[:space:]')
+          if [ -z "$POOLED" ] || [ -z "$DIRECT" ]; then
+            echo "::error::neonctl returned an empty connection string - check NEON_API_KEY/NEON_PROJECT_ID"
+            exit 1
+          fi
+          case "$POOLED" in postgres*) ;; *) echo "::error::Unexpected connection-string format (doesn't start with postgres): got a non-URI response, likely JSON or an error message"; exit 1;; esac
+          echo "::add-mask::$POOLED"
+          echo "::add-mask::$DIRECT"
+          echo "pooled=$POOLED" >> "$GITHUB_OUTPUT"
+          echo "direct=$DIRECT" >> "$GITHUB_OUTPUT"
+
+      - name: Run migrations (Cloud Run Job, direct connection)
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.direct }}
+        run: |
+          # No --command override here, deliberately - only --args. Same
+          # reasoning as the service deploy below: --command replaces
+          # ENTRYPOINT (skipping entrypoint.sh's Postgres-readiness wait
+          # entirely), --args alone replaces only CMD and lets
+          # entrypoint.sh's `exec "$@"` still run first.
+          #
+          # APP_KEY *is* passed here: omitting it doesn't leave the container's
+          # APP_KEY empty, it inherits the Dockerfile's baked-in dummy ENV
+          # value, which entrypoint.sh's fail-closed check then correctly
+          # rejects.
+          gcloud run jobs deploy arh-baca-migrate \
+            --image="${{ env.IMAGE }}" \
+            --region="${{ vars.GCP_REGION }}" \
+            --set-env-vars="DATABASE_URL=${DATABASE_URL},DB_CONNECTION=pgsql,APP_ENV=production,APP_KEY=${{ secrets.APP_KEY }}" \
+            --args="sh,-c,php artisan migrate --force" \
+            --max-retries=0 \
+            --quiet
+          gcloud run jobs execute arh-baca-migrate --region="${{ vars.GCP_REGION }}" --wait --quiet
+
+      # Cloud Run rejects --no-traffic on a service's very first revision
+      # ("not supported when creating a new service") - only meaningful
+      # once a service already exists to preserve traffic on.
+      - name: Check whether the Cloud Run service already exists
+        id: check_service
+        run: |
+          if gcloud run services describe "${{ vars.CLOUD_RUN_SERVICE }}" --region="${{ vars.GCP_REGION }}" --quiet >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy to Cloud Run (no traffic yet, unless this is the first-ever revision)
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v3
+        with:
+          service: ${{ vars.CLOUD_RUN_SERVICE }}
+          region: ${{ vars.GCP_REGION }}
+          image: ${{ env.IMAGE }}
+          no_traffic: ${{ steps.check_service.outputs.exists == 'true' }}
+          # --args only, deliberately no --command: --command replaces
+          # ENTRYPOINT (docker/entrypoint.sh), which would skip its
+          # Postgres-readiness wait, config-cache, and fail-closed
+          # dummy-APP_KEY check entirely. --args alone replaces only CMD;
+          # entrypoint.sh's `exec "$@"` still runs it.
+          flags: >-
+            --args="sh,-c,php artisan serve --host=0.0.0.0 --port=$PORT"
+            --concurrency=1
+            --min-instances=0
+            --max-instances=4
+            --allow-unauthenticated
+          env_vars: |
+            APP_NAME=${{ vars.APP_NAME }}
+            APP_URL=${{ vars.ARH_BACA_APP_URL }}
+            SANCTUM_STATEFUL_DOMAINS=${{ vars.ARH_BACA_APP_URL }}
+            APP_ENV=${{ vars.APP_ENV }}
+            APP_DEBUG=${{ vars.APP_DEBUG }}
+            SESSION_DRIVER=${{ vars.SESSION_DRIVER }}
+            CACHE_STORE=${{ vars.CACHE_STORE }}
+            QUEUE_CONNECTION=${{ vars.QUEUE_CONNECTION }}
+            LOG_CHANNEL=${{ vars.LOG_CHANNEL }}
+            AWS_DEFAULT_REGION=${{ vars.AWS_DEFAULT_REGION }}
+            AWS_USE_PATH_STYLE_ENDPOINT=${{ vars.AWS_USE_PATH_STYLE_ENDPOINT }}
+            AWS_BUCKET=${{ vars.STORAGE_BUCKET }}
+            AWS_ENDPOINT=${{ vars.STORAGE_ENDPOINT }}
+            SKIP_AUTO_MIGRATE=true
+            DATABASE_URL=${{ steps.neon.outputs.pooled }}
+            DB_CONNECTION=pgsql
+            APP_KEY=${{ secrets.APP_KEY }}
+            AWS_ACCESS_KEY_ID=${{ secrets.STORAGE_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            GOOGLE_SEARCH_API_KEY=${{ secrets.GOOGLE_SEARCH_API_KEY }}
+            OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            GOOGLE_AUTH_REDIRECT_URI=${{ vars.ARH_BACA_APP_URL }}/auth/google/callback
+            MAIL_MAILER=${{ vars.MAIL_MAILER || 'log' }}
+            MAIL_FROM_ADDRESS=${{ vars.MAIL_FROM_ADDRESS || 'noreply@example.com' }}
+            MAIL_FROM_NAME=${{ vars.APP_NAME }}
+            MAIL_HOST=${{ vars.MAIL_HOST }}
+            MAIL_PORT=${{ vars.MAIL_PORT }}
+            MAIL_ENCRYPTION=${{ vars.MAIL_ENCRYPTION }}
+            MAIL_USERNAME=${{ vars.MAIL_USERNAME }}
+            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+            RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+
+      - name: Health check the new (not-yet-live) revision
+        run: |
+          curl -sf "${{ steps.deploy.outputs.url }}/up" || (echo "Health check failed - not shifting traffic" && exit 1)
+
+      - name: Grant public invoker (one-time; later revisions preserve it)
+        run: |
+          gcloud run services add-iam-policy-binding "${{ vars.CLOUD_RUN_SERVICE }}" \
+            --region="${{ vars.GCP_REGION }}" \
+            --member="allUsers" \
+            --role="roles/run.invoker" \
+            --quiet || true
+
+      - name: Shift traffic to the new revision
+        run: |
+          gcloud run services update-traffic "${{ vars.CLOUD_RUN_SERVICE }}" \
+            --region="${{ vars.GCP_REGION }}" \
+            --to-latest \
+            --quiet
+
+      - name: Update the scheduler Cloud Run Job
+        run: |
+          gcloud run jobs deploy arh-baca-scheduler \
+            --image="${{ env.IMAGE }}" \
+            --region="${{ vars.GCP_REGION }}" \
+            --args="sh,-c,php artisan schedule:run" \
+            --max-retries=0 \
+            --task-timeout=120 \
+            --set-env-vars="APP_ENV=${{ vars.APP_ENV }},SESSION_DRIVER=${{ vars.SESSION_DRIVER }},CACHE_STORE=${{ vars.CACHE_STORE }},QUEUE_CONNECTION=${{ vars.QUEUE_CONNECTION }},LOG_CHANNEL=${{ vars.LOG_CHANNEL }},AWS_DEFAULT_REGION=${{ vars.AWS_DEFAULT_REGION }},AWS_USE_PATH_STYLE_ENDPOINT=${{ vars.AWS_USE_PATH_STYLE_ENDPOINT }},AWS_BUCKET=${{ vars.STORAGE_BUCKET }},AWS_ENDPOINT=${{ vars.STORAGE_ENDPOINT }},SKIP_AUTO_MIGRATE=true,DATABASE_URL=${{ steps.neon.outputs.pooled }},DB_CONNECTION=pgsql,APP_KEY=${{ secrets.APP_KEY }},AWS_ACCESS_KEY_ID=${{ secrets.STORAGE_ACCESS_KEY_ID }},AWS_SECRET_ACCESS_KEY=${{ secrets.STORAGE_SECRET_ACCESS_KEY }},ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" \
+            --quiet
+
+      - name: Ensure Cloud Scheduler triggers it every minute
+        run: |
+          if gcloud scheduler jobs describe arh-baca-scheduler-trigger --location="${{ vars.GCP_REGION }}" --quiet >/dev/null 2>&1; then
+            echo "Scheduler trigger already exists - nothing to do (it always targets the job by name, so it stays valid across image updates)."
+          else
+            gcloud scheduler jobs create http arh-baca-scheduler-trigger \
+              --location="${{ vars.GCP_REGION }}" \
+              --schedule="* * * * *" \
+              --uri="https://run.googleapis.com/v2/projects/${{ vars.GCP_PROJECT_ID }}/locations/${{ vars.GCP_REGION }}/jobs/arh-baca-scheduler:run" \
+              --http-method=POST \
+              --oauth-service-account-email="${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}" \
+              --oauth-token-scope="https://www.googleapis.com/auth/cloud-platform" \
+              --attempt-deadline="90s" \
+              --time-zone="UTC" \
+              --quiet
+          fi
+
+      - name: Job summary
+        run: |
+          echo "### ARH-Baca deploy" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image: \`${{ env.IMAGE }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Revision: ${{ steps.deploy.outputs.revision }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Migrations: ran via arh-baca-migrate Cloud Run Job" >> "$GITHUB_STEP_SUMMARY"
+
+  smoke-test:
+    name: Production smoke test
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: production
+    if: vars.E2E_SMOKE_ENABLED == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run production smoke journeys
+        env:
+          BASE_URL: ${{ vars.E2E_BASE_URL || needs.deploy.outputs.service_url }}
+          E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+          E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+        run: pnpm exec playwright test tests/e2e/smoke.spec.ts
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-smoke-report
+          path: playwright-report/
+          retention-days: 14

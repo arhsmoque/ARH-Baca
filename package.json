@@ -17,6 +17,9 @@
     "dev:doctor": "node scripts/doctor.mjs",
     "secrets:sync": "node scripts/sync-secrets.mjs",
     "secrets:sync:dry-run": "node scripts/sync-secrets.mjs --dry-run",
+    "test:e2e:install": "pnpm exec playwright install --with-deps chromium",
+    "test:e2e": "pnpm exec playwright test",
+    "test:e2e:ui": "pnpm exec playwright test --ui",
     "prepare": "husky"
   },
   "devDependencies": {

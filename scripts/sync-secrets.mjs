@@ -94,6 +94,19 @@ function setGitHubSecret(key, value) {
   log('set GitHub secret', key);
 }
 
+function parseGoogleOAuth(jsonValue) {
+  try {
+    const parsed = JSON.parse(jsonValue);
+    const web = parsed?.web || {};
+    return {
+      clientId: web.client_id,
+      clientSecret: web.client_secret,
+    };
+  } catch {
+    return {};
+  }
+}
+
 async function main() {
   log(DRY_RUN ? 'starting (dry-run)' : 'starting');
 
@@ -110,29 +123,84 @@ async function main() {
   const rootSecrets = await fetchInfisicalSecrets(token, '/');
   const appSecrets = await fetchInfisicalSecrets(token, '/arh-baca');
 
-  const githubPat = getSecret(rootSecrets, 'GITHUB_PAT');
   const appKey = getSecret(appSecrets, 'APP_KEY');
+  const githubPat = getSecret(rootSecrets, 'GITHUB_PAT');
 
-  const missing = [];
-  if (!githubPat) missing.push('GITHUB_PAT at /');
-  if (!appKey) missing.push('APP_KEY at /arh-baca');
+  const missingRequired = [];
+  if (!githubPat) missingRequired.push('GITHUB_PAT at /');
+  if (!appKey) missingRequired.push('APP_KEY at /arh-baca');
 
-  if (missing.length > 0) {
-    fail('missing source secrets:', missing.join('; '));
+  if (missingRequired.length > 0) {
+    fail('missing required source secrets:', missingRequired.join('; '));
     return;
   }
 
-  const githubPairs = [
+  // Required secrets that must exist for CI/deploy to function.
+  const requiredPairs = [
     ['APP_KEY', appKey],
     ['GH_PAT', githubPat],
   ];
 
-  for (const [key, value] of githubPairs) {
+  for (const [key, value] of requiredPairs) {
     try {
       setGitHubSecret(key, value);
     } catch (err) {
       fail(`GitHub ${key}:`, err.message);
     }
+  }
+
+  // Shared ARH secrets synced from Infisical root when present.
+  // These are optional for local development but expected in production.
+  const optionalMappings = [
+    ['ANTHROPIC', 'ANTHROPIC_API_KEY'],
+    ['GEMINI', 'GEMINI_API_KEY'],
+    ['OPENROUTER_MAIN', 'OPENROUTER_API_KEY'],
+    ['GROQ_1', 'GROQ_API_KEY'],
+    ['TAVILY', 'TAVILY_API_KEY'],
+    ['GOOGLE_SEARCH', 'GOOGLE_SEARCH_API_KEY'],
+    ['BRAVE_SEARCH', 'BRAVE_SEARCH_API_KEY'],
+    ['EXA', 'EXA_API_KEY'],
+    ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_ACCOUNT_ID'],
+    ['CLOUDFLARE_WORKERS_API_TOKEN', 'CLOUDFLARE_API_TOKEN'],
+    ['BACKBLAZE_B2_KEYID', 'B2_ACCESS_KEY_ID'],
+    ['BACKBLAZE_B2', 'B2_SECRET_ACCESS_KEY'],
+    ['TUGAS_RESEND', 'RESEND_API_KEY'],
+  ];
+
+  for (const [infisicalKey, githubKey] of optionalMappings) {
+    const value = getSecret(rootSecrets, infisicalKey);
+    if (!value) {
+      log('optional source secret not found, skipping:', infisicalKey);
+      continue;
+    }
+    try {
+      setGitHubSecret(githubKey, value);
+    } catch (err) {
+      fail(`GitHub ${githubKey}:`, err.message);
+    }
+  }
+
+  // Google OAuth client is stored as a single JSON blob; expand it into
+  // separate GitHub secrets so the deploy workflow can consume them directly.
+  const googleOAuth = getSecret(rootSecrets, 'GOOGLE_OAUTH_CLIENT_ARH_HOMELAB');
+  if (googleOAuth) {
+    const { clientId, clientSecret } = parseGoogleOAuth(googleOAuth);
+    if (clientId) {
+      try {
+        setGitHubSecret('GOOGLE_CLIENT_ID', clientId);
+      } catch (err) {
+        fail('GitHub GOOGLE_CLIENT_ID:', err.message);
+      }
+    }
+    if (clientSecret) {
+      try {
+        setGitHubSecret('GOOGLE_CLIENT_SECRET', clientSecret);
+      } catch (err) {
+        fail('GitHub GOOGLE_CLIENT_SECRET:', err.message);
+      }
+    }
+  } else {
+    log('optional source secret not found, skipping: GOOGLE_OAUTH_CLIENT_ARH_HOMELAB');
   }
 
   log(DRY_RUN ? 'dry-run complete' : 'complete');

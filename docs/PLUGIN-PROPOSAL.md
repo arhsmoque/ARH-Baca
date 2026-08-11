@@ -36,6 +36,9 @@ Trade-off: one attractive plugin, `tomatophp/filament-notes`, is Filament v3 onl
 | `tales-virtualy/filament-kanban-board`                   | Kanban / project boards   | 3/4/5          | Compatible   | **Adopt**                                          |
 | `LACV/pipo-scanner`                                      | Document scanner          | 3/5            | 10/11/12/13  | **Optional** for mobile scan-to-PDF                |
 | `wirechat/wirechat`                                      | Messaging                 | N/A (Livewire) | Check latest | **Adopt** instead of `adultdate/filament-wirechat` |
+| `hammadzafar05/filament-mobile-preset`                   | Mobile-first UI           | 4/5            | 11+          | **Adopt** for phone/tablet UX                      |
+| `kseven/filament-seven-theme`                            | Responsive theme          | 4              | 11+          | **Optional** theme alternative                     |
+| `kstmostofa/laravel-whatsapp`                            | WhatsApp messaging        | N/A            | 11/12/13     | **Adopt** for WhatsApp notifications               |
 | `tomatophp/filament-notes`                               | Sticky notes              | 3 only         | 11+          | **Skip** — v3 blocker                              |
 | `alessandronuunes/tasks-management`                      | Task management           | 3 only         | 11           | **Skip** — v3 blocker, stale                       |
 | `creativetimofficial/soft-ui-dashboard-laravel-livewire` | Full starter app          | N/A            | 11           | **Reference only** — not a package                 |
@@ -100,7 +103,40 @@ If that combination proves fragile, **pick one**:
 - **Integration effort:** medium-high — real-time broadcasting adds infrastructure (queue worker + Reverb/Pusher + Laravel Echo).
 - **Verdict:** **Adopt upstream `wirechat/wirechat`** for student-to-student and group messaging.
 
-### 6. Notes — skip `tomatophp/filament-notes`, build v4-native
+### 6. Mobile-first UI — `hammadzafar05/filament-mobile-preset`
+
+- **Status:** Active. Last push mid-2026, tests and code-style actions green.
+- **Stack:** PHP 8.2+, Filament 4.11.5+/5.6.5+, requires `hammadzafar05/mobile-bottom-nav`.
+- **Why it fits:** ARH-Baca's primary users are students on phones and tablets. This plugin bundles the mobile-specific defaults we need:
+  - Bottom navigation bar (auto-extracted from Filament navigation).
+  - Tables stack into labelled cards below 640 px instead of sideways scrolling.
+  - Action buttons move to thumb reach.
+  - Modals open as slide-overs.
+  - 44 px touch targets via CSS `@media (pointer: coarse)`.
+  - `viewport-fit=cover` meta tag for iOS safe areas.
+- **How to use:** register `FilamentMobilePresetPlugin::make()` in the panel provider. Optional: configure `MobileBottomNav::make()->fromNavigation(5)`.
+- **Integration effort:** low — no custom theme or Tailwind `@source` needed; stylesheet is injected inline.
+- **Verdict:** **Adopt** as the default mobile experience.
+
+#### Alternative / complementary: `kseven/filament-seven-theme`
+
+- **Status:** Active. Filament v4 only, stable release available.
+- **Why it fits:** A polished responsive theme with light/dark mode. Can be combined with the mobile preset if the visual style is preferred over FilaCraft/filament-themes.
+- **Verdict:** **Optional** — evaluate against `filacraft`/`filament-themes` in Phase 1 and pick one theme strategy.
+
+### 7. WhatsApp integration — `kstmostofa/laravel-whatsapp`
+
+- **Status:** Active. Laravel 11/12/13 compatible, 46 tests passing, dual backend.
+- **Stack:** PHP 8.2+, Laravel 11/12/13, optional Livewire/Flux for admin UI.
+- **Why it fits:** Provides both Meta Cloud API (official, template-based) and `whatsapp-web.js` sidecar (personal-number, free-form) under a single `WhatsApp::` facade. Useful for:
+  - Exam reminder broadcasts to students.
+  - Assignment deadline nudges.
+  - Parent/guardian notifications (if opted in).
+- **How to use:** `composer require kstmostofa/laravel-whatsapp`, publish config/migrations, set `WHATSAPP_*` env vars. Use Cloud API for transactional/template sends; use the web sidecar only if personal-number messaging is required.
+- **Integration effort:** medium — requires Meta developer app or a paired phone for the sidecar; webhooks need `WHATSAPP_VERIFY_TOKEN` and `WHATSAPP_APP_SECRET`.
+- **Verdict:** **Adopt** for WhatsApp notifications.
+
+### 8. Notes — skip `tomatophp/filament-notes`, build v4-native
 
 - **Why skip:** `tomatophp/filament-notes` requires `filament/filament: ^3.0`. It will not install on a Filament v4 project.
 - **Recommended alternative:** Build a lightweight `Note` resource with Filament v4 native components:
@@ -115,7 +151,7 @@ If that combination proves fragile, **pick one**:
 - **Link to calendar:** `events.note_id` nullable foreign key, so clicking an exam opens its note.
 - **Verdict:** **Custom build** using Filament v4 primitives.
 
-### 7. Document scanning — `LACV/pipo-scanner`
+### 9. Document scanning — `LACV/pipo-scanner`
 
 - **Status:** Active. Latest release `v1.0.2` (March 2026), last push July 2026.
 - **Stack:** PHP 8.1+, Filament 3/5, Laravel 10–13.
@@ -123,7 +159,7 @@ If that combination proves fragile, **pick one**:
 - **Caveat:** Supports Filament 3 and 5, but **not 4**. If ARH-Baca stays on Filament 4, this package cannot be used unless the maintainer adds v4 support or we fork/contribute.
 - **Verdict:** **Park** until v4 support is confirmed.
 
-### 8. `spatie/laravel-dashboard`
+### 10. `spatie/laravel-dashboard`
 
 - **Status:** Mature. Latest release `4.0.0` (March 2026), 574 stars.
 - **Stack:** PHP 8.3+, Laravel 11/12/13, Livewire 4.
@@ -152,6 +188,10 @@ ARH-Baca (Laravel 13 + Filament v4 panel)
 ├── Collaboration
 │   ├── tales-virtualy/filament-kanban-board  → project boards
 │   └── wirechat/wirechat                     → direct/group chat
+├── Mobile-first UX
+│   └── hammadzafar05/filament-mobile-preset  → bottom nav, stacked tables, slide-overs, touch targets
+├── Notifications
+│   └── kstmostofa/laravel-whatsapp           → WhatsApp reminders/alerts
 └── Optional future
     └── LACV/pipo-scanner (pending Filament v4 support)
 ```
@@ -166,13 +206,17 @@ ARH-Baca (Laravel 13 + Filament v4 panel)
 4. Add the panel Vite input to `vite.config.js`.
 5. Run `pnpm run build` and verify `php artisan filament:install --panels` output.
 
-### Phase 1 — Personalization
+### Phase 1 — Personalization + mobile-first UX
 
 1. `composer require silasrm/filament-themes slym758/filacraft`
-2. Register both plugins in the `student` panel.
-3. Add `theme` string column to `users` for `filament-themes`.
-4. Run migrations.
-5. Playwright rehearsal: switch theme, change font, assert persistence across reload.
+2. `composer require hammadzafar05/filament-mobile-preset`
+3. Register the plugins in the `student` panel.
+4. Add `theme` string column to `users` for `filament-themes`.
+5. Run migrations.
+6. Playwright rehearsal:
+   - Desktop: switch theme, change font, assert persistence across reload.
+   - Mobile: verify bottom nav appears, tables stack, modals slide over.
+   - Tablet (iPad): verify sidebar collapses and layouts stay readable.
 
 ### Phase 2 — Calendar + Notes
 
@@ -183,14 +227,17 @@ ARH-Baca (Laravel 13 + Filament v4 panel)
 5. Link `Event` → `Note` and add a "view note" action on calendar events.
 6. Playwright rehearsal: create exam, open linked note.
 
-### Phase 3 — Collaboration
+### Phase 3 — Collaboration + notifications
 
 1. `composer require tales-virtualy/filament-kanban-board`
 2. Register plugin, run migrations, seed default tags.
 3. `composer require wirechat/wirechat`
 4. Publish config/migrations, add `Chatable` trait to `User`, configure broadcasting.
 5. Add a "Messages" custom page in the panel embedding the WireChat component.
-6. Playwright rehearsal: create board, move card, send message.
+6. `composer require kstmostofa/laravel-whatsapp`
+7. Publish config/migrations, set `WHATSAPP_*` env vars, configure Meta Cloud API (preferred) or web sidecar.
+8. Add queued jobs for exam/deadline reminders via WhatsApp.
+9. Playwright rehearsal: create board, move card, send message.
 
 ### Phase 4 — Optional scanner
 
@@ -199,25 +246,30 @@ ARH-Baca (Laravel 13 + Filament v4 panel)
 
 ## Version compatibility watchlist
 
-| Package                                | Constraint today            | Risk                        |
-| -------------------------------------- | --------------------------- | --------------------------- |
-| `saade/filament-fullcalendar`          | `filament ^4.0\|^5.0`       | Low                         |
-| `silasrm/filament-themes`              | `filament ^4.0\|^5.0`       | Low (no stable release yet) |
-| `slym758/filacraft`                    | `filament ^4.0\|\|^5.0`     | Low                         |
-| `tales-virtualy/filament-kanban-board` | `filament ^3.0\|^4.0\|^5.0` | Low                         |
-| `LACV/pipo-scanner`                    | `filament ^3.0\|^5.0`       | **High** — no v4 support    |
-| `adultdate/filament-wirechat`          | `laravel ^10\|^11\|^12`     | **Blocker** — no Laravel 13 |
-| `tomatophp/filament-notes`             | `filament ^3.0`             | **Blocker** — no v4 support |
+| Package                                | Constraint today            | Risk                                 |
+| -------------------------------------- | --------------------------- | ------------------------------------ |
+| `saade/filament-fullcalendar`          | `filament ^4.0\|^5.0`       | Low                                  |
+| `silasrm/filament-themes`              | `filament ^4.0\|^5.0`       | Low (no stable release yet)          |
+| `slym758/filacraft`                    | `filament ^4.0\|\|^5.0`     | Low                                  |
+| `tales-virtualy/filament-kanban-board` | `filament ^3.0\|^4.0\|^5.0` | Low                                  |
+| `LACV/pipo-scanner`                    | `filament ^3.0\|^5.0`       | **High** — no v4 support             |
+| `adultdate/filament-wirechat`          | `laravel ^10\|^11\|^12`     | **Blocker** — no Laravel 13          |
+| `tomatophp/filament-notes`             | `filament ^3.0`             | **Blocker** — no v4 support          |
+| `hammadzafar05/filament-mobile-preset` | `filament ^4.11.5\|^5.6.5`  | Low — requires recent Filament patch |
+| `kstmostofa/laravel-whatsapp`          | `laravel ^11\|^12\|^13`     | Low                                  |
 
 ## Risks and mitigations
 
-| Risk                                     | Mitigation                                                                       |
-| ---------------------------------------- | -------------------------------------------------------------------------------- |
-| Two theme plugins conflict               | Start with one; isolate responsibilities; keep customization behind feature flag |
-| WireChat real-time infra                 | Use Laravel Reverb (official, Laravel 11+) or Pusher; run queue worker in prod   |
-| Kanban board CSS missing                 | Always include package `@source` path in panel theme CSS and rebuild             |
-| `filament-themes` has no stable release  | Pin to a specific commit/hash or wait for first release before production        |
-| Filament v4 minor breaks `filacraft` CSS | Monitor package updates; keep a visual Playwright regression suite               |
+| Risk                                               | Mitigation                                                                          |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Two theme plugins conflict                         | Start with one; isolate responsibilities; keep customization behind feature flag    |
+| WireChat real-time infra                           | Use Laravel Reverb (official, Laravel 11+) or Pusher; run queue worker in prod      |
+| Kanban board CSS missing                           | Always include package `@source` path in panel theme CSS and rebuild                |
+| `filament-themes` has no stable release            | Pin to a specific commit/hash or wait for first release before production           |
+| Filament v4 minor breaks `filacraft` CSS           | Monitor package updates; keep a visual Playwright regression suite                  |
+| Mobile preset inline stylesheet conflicts with CSP | Ensure `style-src 'unsafe-inline'` is allowed for the panel                         |
+| WhatsApp Cloud API requires Meta app approval      | Start with sandbox/test number; plan business verification for production           |
+| WhatsApp web sidecar ToS risk                      | Prefer Cloud API for transactional sends; sidecar only for personal-number features |
 
 ## Open questions / parked items
 
@@ -245,6 +297,11 @@ All inspected repositories are available as git submodules under `research/plugi
 | `research/plugins/tasks-management`                   | `alessandronuunes/tasks-management`                      | `main` HEAD      |
 | `research/plugins/pipo-scanner`                       | `LACV/pipo-scanner`                                      | `main` HEAD      |
 | `research/plugins/silverstripe-pdf-parser`            | `andrewandante/silverstripe-pdf-parser`                  | `main` HEAD      |
+| `research/plugins/laravel-mobiler`                    | `halilcosdu/laravel-mobiler`                             | `main` HEAD      |
+| `research/plugins/mobile-bottom-nav`                  | `hammadzafar05/mobile-bottom-nav`                        | `main` HEAD      |
+| `research/plugins/filament-seven-theme`               | `ksevendev/filament-seven-theme`                         | `main` HEAD      |
+| `research/plugins/filament-mobile-preset`             | `hammadzafar05/filament-mobile-preset`                   | `main` HEAD      |
+| `research/plugins/laravel-whatsapp`                   | `hammadzafar05/laravel-whatsapp`                         | `main` HEAD      |
 
 ## Next step
 

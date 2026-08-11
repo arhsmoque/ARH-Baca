@@ -31,3 +31,18 @@
 [submodule "research/plugins/silverstripe-pdf-parser"]
 	path = research/plugins/silverstripe-pdf-parser
 	url = https://github.com/andrewandante/silverstripe-pdf-parser.git
+[submodule "research/plugins/laravel-mobiler"]
+	path = research/plugins/laravel-mobiler
+	url = https://github.com/halilcosdu/laravel-mobiler.git
+[submodule "research/plugins/mobile-bottom-nav"]
+	path = research/plugins/mobile-bottom-nav
+	url = https://github.com/hammadzafar05/mobile-bottom-nav.git
+[submodule "research/plugins/filament-seven-theme"]
+	path = research/plugins/filament-seven-theme
+	url = https://github.com/ksevendev/filament-seven-theme.git
+[submodule "research/plugins/filament-mobile-preset"]
+	path = research/plugins/filament-mobile-preset
+	url = https://github.com/hammadzafar05/filament-mobile-preset.git
+[submodule "research/plugins/laravel-whatsapp"]
+	path = research/plugins/laravel-whatsapp
+	url = https://github.com/hammadzafar05/laravel-whatsapp.git
