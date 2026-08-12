@@ -123,7 +123,7 @@ Source of truth: **Infisical project** `90b0e7ef-3f72-4ddb-b888-055e90e13dfa` (s
   - `GITHUB_PAT` — personal access token with `repo` scope, used by `sync-secrets.mjs`
   - `ANTHROPIC`, `GEMINI`, `OPENROUTER_MAIN`, `GROQ_1`, `TAVILY`, `GOOGLE_SEARCH`, `BRAVE_SEARCH`, `EXA`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_WORKERS_API_TOKEN`, `BACKBLAZE_B2_KEYID`, `BACKBLAZE_B2`, `TUGAS_RESEND`, `GOOGLE_OAUTH_CLIENT_ARH_HOMELAB`
 - Required GitHub repository secrets:
-  - `APP_KEY`, `GH_PAT`, `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`
+  - `APP_KEY` (deployment only; CI and UI tests generate an ephemeral key), `GH_PAT`, `INFISICAL_CLIENT_ID`, `INFISICAL_CLIENT_SECRET`
   - `NEON_API_KEY`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY`, `MAIL_PASSWORD`
 
 ## CI / CD

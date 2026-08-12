@@ -38,11 +38,7 @@ jobs:
       - name: Set up ephemeral app (SQLite)
         run: |
           cp .env.example .env
-          if [ -n "${{ secrets.APP_KEY }}" ]; then
-            sed -i "s|^APP_KEY=.*|APP_KEY=${{ secrets.APP_KEY }}|" .env
-          else
-            php artisan key:generate
-          fi
+          php artisan key:generate
           sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
           sed -i 's/^CACHE_STORE=.*/CACHE_STORE=file/' .env
           sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' .env
