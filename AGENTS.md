@@ -35,8 +35,15 @@ A Laravel 13 + Filament + Livewire collaborative study platform. Successor to th
 ## Local commands
 
 ```bash
+# Discover repository tooling and per-action help
+pnpm baca -- --list
+pnpm baca -- --help readiness
+
 # Verify environment
 pnpm run dev:doctor
+
+# Verify environment plus the Composer/Playwright outbound hosts
+pnpm run dev:readiness
 
 # Install everything
 composer install
@@ -71,6 +78,10 @@ pnpm run test:e2e:ui        # UI rehearsals in headed/debug mode
 pnpm exec playwright test   # direct Playwright invocation
 composer run ide:helpers    # regenerate IDE helper files
 ```
+
+`scripts/baca.mjs` is the cross-platform routing entrypoint for recurring development
+actions. Add an action there only after the underlying command exists and has a stable,
+verified contract; keep credentialed infrastructure mutations outside the DEV catalog.
 
 ## Doctrine notes
 
