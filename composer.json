@@ -21,7 +21,7 @@
     "phpunit/phpunit": "^12.5.12",
     "rector/rector": "^2.0",
     "shipmonk/phpstan-baseline-per-identifier": "^2.0",
-    "staabm/phpstan-todo-by": "^0.2"
+    "staabm/phpstan-todo-by": "^0.3"
   },
   "autoload": {
     "psr-4": {
